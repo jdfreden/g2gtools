@@ -59,6 +59,7 @@ class G2GToolsApp(object):
     def __init__(self):
         self.script_name = os.path.basename(__file__)
         parser = argparse.ArgumentParser(add_help=False)
+        print("HELLO. JAKE IS THE CAPTAIN NOW")
 
         def print_message(message):
             sys.stderr.write(logo_text)
@@ -128,6 +129,6 @@ class G2GToolsApp(object):
     def logo(self):
         print(logo_text)
 
+
 if __name__ == '__main__':
     G2GToolsApp()
-

@@ -13,6 +13,7 @@ import unittest
 # import shutil
 # import pysam
 # from . import bamsam, chain
+from g2gtools import bsam
 
 
 class TestG2gtools(unittest.TestCase):
@@ -58,6 +59,7 @@ class TestG2gtools(unittest.TestCase):
         #
         # shutil.rmtree(self.output_dir)
         pass
+
 
 
 if __name__ == '__main__':

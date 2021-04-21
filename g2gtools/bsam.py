@@ -21,18 +21,18 @@ from . import g2g_utils
 from . import vci
 from . import __version__
 
-FLAG_NONE = 0x0             # base value
-FLAG_PAIRED = 0x1           # template having multiple segments in sequencing
-FLAG_PROPER_PAIR = 0x2      # each segment properly aligned according to the aligner
-FLAG_UNMAP = 0x4            # segment unmapped
-FLAG_MUNMAP = 0x8           # next segment in the template unmapped (mate unmapped)
-FLAG_REVERSE = 0x10         # SEQ being reverse complemented
-FLAG_MREVERSE = 0x20        # SEQ of the next segment in the template being reversed
-FLAG_READ1 = 0x40           # the first segment in the template
-FLAG_READ2 = 0x80           # the last segment in the template
-FLAG_SECONDARY = 0x100      # secondary alignment
-FLAG_QCFAIL = 0x200         # not passing quality controls
-FLAG_DUP = 0x400            # PCR or optical duplicate
+FLAG_NONE = 0x0  # base value
+FLAG_PAIRED = 0x1  # template having multiple segments in sequencing
+FLAG_PROPER_PAIR = 0x2  # each segment properly aligned according to the aligner
+FLAG_UNMAP = 0x4  # segment unmapped
+FLAG_MUNMAP = 0x8  # next segment in the template unmapped (mate unmapped)
+FLAG_REVERSE = 0x10  # SEQ being reverse complemented
+FLAG_MREVERSE = 0x20  # SEQ of the next segment in the template being reversed
+FLAG_READ1 = 0x40  # the first segment in the template
+FLAG_READ2 = 0x80  # the last segment in the template
+FLAG_SECONDARY = 0x100  # secondary alignment
+FLAG_QCFAIL = 0x200  # not passing quality controls
+FLAG_DUP = 0x400  # PCR or optical duplicate
 FLAG_SUPPLEMENTARY = 0x800  # supplementary alignment
 
 REGEX_CIGAR = re.compile("(\d+)([\w=])")
@@ -155,10 +155,40 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
     tmp = []
     name_to_id = {}
     id = 0
+    print("HELLO FROM JAKES BSAM")
 
+    # I have made changes here because I did not understand what the original codes required from the vci_file and sam_file header.
+    # The original code seems to adjust the header appropriately by pushing the new header into 'tmp'
+    # but it then gives that contig the idx from the same file.
+    # This is a problem because vci_file.contigs returns a Dict which is unordered and will be different from the sam file
+    ## header even if the contigs are in the same order in the vci file and the genome the reads were aligned to.
+
+    """
+        Example.
+            SAM FILE                VCI
+            - chr1                  - chr1
+            - chr2                  - chr2
+            - chr3                  - chr3
+              ...                     ...
+              
+            These files give the contigs in the same order in the header.
+            In the sam_file object, the header is stored as in OrderedDict which keeps the order from the header.
+            the vci_file stores the contigs in an ordinary dictionary which is unordered. Resulting in a case like this:
+            
+            SAM FILE                VCI
+            - chr1                  - chr11
+            - chr2                  - chrM
+            - chr3                  - chr1
+              ...                     ...
+              
+            In the original code, 'chr11' would get an idx of 11 because it would be the 11th contig in the sam file.
+            However, later in the code when the alignments are being converted it refers the 11th idx in the VCI ordering
+            which is estentially random due to it being an ordinary dict. 
+    """
     for ref_name in vci_file.contigs:
         tmp.append({'LN': vci_file.contigs[ref_name], 'SN': ref_name})
-        name_to_id[ref_name] = sam_file.get_tid(ref_name)
+        # name_to_id[ref_name] = sam_file.get_tid(ref_name)
+        name_to_id[ref_name] = id
         id += 1
 
     new_header['SQ'] = tmp
@@ -219,7 +249,8 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
                     elif k.startswith('fail'):
                         status_failed += v
 
-                LOG.info("Processed {0:,} reads, {1:,} successful, {2:,} failed".format(total, status_success, status_failed))
+                LOG.info("Processed {0:,} reads, {1:,} successful, {2:,} failed".format(total, status_success,
+                                                                                        status_failed))
 
             if compat.is_py2:
                 alignment = sam_file.next()
@@ -276,8 +307,9 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
 
             total += 1
 
-            LOG.debug('~'*80)
-            LOG.debug("Converting {0} {1} {2} {3}".format(alignment.qname, read_chr, alignment.pos, alignment.cigarstring))
+            LOG.debug('~' * 80)
+            LOG.debug(
+                "Converting {0} {1} {2} {3}".format(alignment.qname, read_chr, alignment.pos, alignment.cigarstring))
 
             if alignment.is_qcfail:
                 LOG.debug("\tFail due to qc of old alignment")
@@ -308,7 +340,6 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
 
                 mappings = vci_file.find_mappings(read_chr, read_start, read_end)
 
-
                 # unmapped
                 if mappings is None:
                     LOG.debug("\tFail due to no mappings")
@@ -337,7 +368,8 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
 
                     alignment_new.tid = name_to_id[mappings[0].to_chr]
                     alignment_new.pos = mappings[0].to_start
-                    alignment_new.cigar = convert_cigar(alignment.cigar, read_chr, vci_file, alignment.seq, read_strand, alignment.pos)
+                    alignment_new.cigar = convert_cigar(alignment.cigar, read_chr, vci_file, alignment.seq, read_strand,
+                                                        alignment.pos)
                     new_file.write(alignment_new)
 
                     LOG.debug("\tSuccess (complex): {0} {1}".format(alignment_new.pos, alignment_new.cigarstring))
@@ -368,7 +400,7 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
                 read1_start = alignment.pos
                 read1_end = alignment.aend
                 read1_strand = '-' if alignment.is_reverse else '+'
-                read1_mappings = vci_file.find_mappings(read1_chr, read1_start, read1_end) #, read1_strand)
+                read1_mappings = vci_file.find_mappings(read1_chr, read1_start, read1_end)  # , read1_strand)
 
                 if alignment.mate_is_unmapped:
                     alignment_new.flag |= FLAG_MUNMAP
@@ -378,7 +410,7 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
                     read2_end = read2_start + 1
                     read2_strand = '-' if alignment.mate_is_reverse else '+'
                     try:
-                        read2_mappings = vci_file.find_mappings(read2_chr, read2_start, read2_end) #, read2_strand)
+                        read2_mappings = vci_file.find_mappings(read2_chr, read2_start, read2_end)  # , read2_strand)
                     except:
                         read2_mappings = None
 
@@ -401,7 +433,8 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
                     alignment_new.pnext = read2_mappings[0].to_start
                     alignment_new.tlen = 0
 
-                    LOG.debug("\tPair Success (1:fail,2:simple): {0} {1}".format(alignment_new.pos, alignment_new.cigarstring))
+                    LOG.debug("\tPair Success (1:fail,2:simple): {0} {1}".format(alignment_new.pos,
+                                                                                 alignment_new.cigarstring))
                     new_file.write(alignment_new)
                     map_statistics_pair['success_1_fail_2_simple'] += 1
 
@@ -415,7 +448,8 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
                     alignment_new.pnext = read2_mappings[0].to_start
                     alignment_new.tlen = 0
 
-                    LOG.debug("\tPair Success (1:fail,2:complex): {0} {1}".format(alignment_new.pos, alignment_new.cigarstring))
+                    LOG.debug("\tPair Success (1:fail,2:complex): {0} {1}".format(alignment_new.pos,
+                                                                                  alignment_new.cigarstring))
                     new_file.write(alignment_new)
                     map_statistics_pair['success_1_fail_2_complex'] += 1
 
@@ -429,9 +463,10 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
 
                     alignment_new.rnext = name_to_id[read1_mappings[0].to_chr]
                     alignment_new.pnext = 0
-                    alignment_new.tlen = 0    # CHECK
+                    alignment_new.tlen = 0  # CHECK
 
-                    LOG.debug("\tPair Success (1:simple,2:fail): {0} {1}".format(alignment_new.pos, alignment_new.cigarstring))
+                    LOG.debug("\tPair Success (1:simple,2:fail): {0} {1}".format(alignment_new.pos,
+                                                                                 alignment_new.cigarstring))
                     new_file.write(alignment_new)
                     map_statistics_pair['success_1_simple_2_fail'] += 1
 
@@ -443,9 +478,10 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
 
                     alignment_new.rnext = name_to_id[read2_mappings[0].to_chr]
                     alignment_new.pnext = read2_mappings[0].to_start
-                    alignment_new.tlen = 0    # CHECK
+                    alignment_new.tlen = 0  # CHECK
 
-                    LOG.debug("\tPair Success (1:simple,2:simple): {0} {1}".format(alignment_new.pos, alignment_new.cigarstring))
+                    LOG.debug("\tPair Success (1:simple,2:simple): {0} {1}".format(alignment_new.pos,
+                                                                                   alignment_new.cigarstring))
                     new_file.write(alignment_new)
                     map_statistics_pair['success_1_simple_2_simple'] += 1
 
@@ -457,9 +493,10 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
 
                     alignment_new.rnext = name_to_id[read2_mappings[0].to_chr]
                     alignment_new.pnext = read2_mappings[0].to_start
-                    alignment_new.tlen = 0    # CHECK
+                    alignment_new.tlen = 0  # CHECK
 
-                    LOG.debug("\tPair Success (1:simple,2:complex): {0} {1}".format(alignment_new.pos, alignment_new.cigarstring))
+                    LOG.debug("\tPair Success (1:simple,2:complex): {0} {1}".format(alignment_new.pos,
+                                                                                    alignment_new.cigarstring))
                     new_file.write(alignment_new)
                     map_statistics_pair['success_1_simple_2_complex'] += 1
 
@@ -469,13 +506,15 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
 
                     alignment_new.tid = name_to_id[read1_mappings[0].to_chr]
                     alignment_new.pos = read1_mappings[0].to_start
-                    alignment_new.cigar = convert_cigar(alignment.cigar, read_chr, vci_file, alignment.seq, read1_strand, alignment.pos)
+                    alignment_new.cigar = convert_cigar(alignment.cigar, read_chr, vci_file, alignment.seq,
+                                                        read1_strand, alignment.pos)
 
                     alignment_new.rnext = name_to_id[read1_mappings[0].to_chr]
                     alignment_new.pnext = 0
-                    alignment_new.tlen = 0    # CHECK
+                    alignment_new.tlen = 0  # CHECK
 
-                    LOG.debug("\tPair Success (1:complex,2:fail): {0} {1}".format(alignment_new.pos, alignment_new.cigarstring))
+                    LOG.debug("\tPair Success (1:complex,2:fail): {0} {1}".format(alignment_new.pos,
+                                                                                  alignment_new.cigarstring))
                     new_file.write(alignment_new)
                     map_statistics_pair['success_1_complex_2_fail'] += 1
 
@@ -483,13 +522,15 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
 
                     alignment_new.tid = name_to_id[read1_mappings[0].to_chr]
                     alignment_new.pos = read1_mappings[0].to_start
-                    alignment_new.cigar = convert_cigar(alignment.cigar, read_chr, vci_file, alignment.seq, read1_strand, alignment.pos)
+                    alignment_new.cigar = convert_cigar(alignment.cigar, read_chr, vci_file, alignment.seq,
+                                                        read1_strand, alignment.pos)
 
                     alignment_new.rnext = name_to_id[read2_mappings[0].to_chr]
                     alignment_new.pnext = read2_mappings[0].to_start
-                    alignment_new.tlen = 0    # CHECK
+                    alignment_new.tlen = 0  # CHECK
 
-                    LOG.debug("\tPair Success (1:complex,2:simple): {0} {1}".format(alignment_new.pos, alignment_new.cigarstring))
+                    LOG.debug("\tPair Success (1:complex,2:simple): {0} {1}".format(alignment_new.pos,
+                                                                                    alignment_new.cigarstring))
                     new_file.write(alignment_new)
                     map_statistics_pair['success_1_complex_2_simple'] += 1
 
@@ -497,13 +538,15 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
 
                     alignment_new.tid = name_to_id[read1_mappings[0].to_chr]
                     alignment_new.pos = read1_mappings[0].to_start
-                    alignment_new.cigar = convert_cigar(alignment.cigar, read_chr, vci_file, alignment.seq, read1_strand, alignment.pos)
+                    alignment_new.cigar = convert_cigar(alignment.cigar, read_chr, vci_file, alignment.seq,
+                                                        read1_strand, alignment.pos)
 
                     alignment_new.rnext = name_to_id[read2_mappings[0].to_chr]
                     alignment_new.pnext = read2_mappings[0].to_start
-                    alignment_new.tlen = 0    # CHECK
+                    alignment_new.tlen = 0  # CHECK
 
-                    LOG.debug("\tPair Success (1:complex,2:complex): {0} {1}".format(alignment_new.pos, alignment_new.cigarstring))
+                    LOG.debug("\tPair Success (1:complex,2:complex): {0} {1}".format(alignment_new.pos,
+                                                                                     alignment_new.cigarstring))
                     new_file.write(alignment_new)
                     map_statistics_pair['success_1_complex_2_complex'] += 1
 
@@ -605,6 +648,7 @@ def cigarlist_to_cigarstring(cigar_list):
 
     return cigar
 
+
 def cigar_to_string(cigar):
     """
     Convert a list of tuples into a cigar string.
@@ -631,6 +675,7 @@ def cigar_to_string(cigar):
 
     return cigar
 
+
 def _cigar_to_list(cigar_string):
     """
     Convert a list of tuples into a cigar string
@@ -656,7 +701,7 @@ def _cigar_to_list(cigar_string):
     lst = []
     try:
         for m in matches:
-            lst.append(1)#(CIGAR_CODES_REV[m[1]], int(m[0])))
+            lst.append(1)  # (CIGAR_CODES_REV[m[1]], int(m[0])))
     except KeyError:
         raise exceptions.G2GCigarFormatError("Invalid cigar string: {0} : {1} ".format(cigar_string, str(m)))
 
@@ -693,7 +738,8 @@ def _cigar_convert(cigar, chromosome, vci_file, strand='+', position=0):
     for c in cigar:
         cigar_no += 1
 
-        LOG.debug("Element #{0}, '{1}{2}' specified, location: {3}".format(cigar_no, c[1], CIGAR_N2C[c[0]], current_pos))
+        LOG.debug(
+            "Element #{0}, '{1}{2}' specified, location: {3}".format(cigar_no, c[1], CIGAR_N2C[c[0]], current_pos))
 
         increment = c[1]
 
@@ -705,7 +751,9 @@ def _cigar_convert(cigar, chromosome, vci_file, strand='+', position=0):
                 cigar_new.append(Cigar(CIGAR_S, c[1], 0, 0))
             elif len(new_mappings) == 1:
                 LOG.debug("Mappings: Easy: {0}".format(new_mappings[0]))
-                cigar_new.append(Cigar(CIGAR_M, new_mappings[0].to_end - new_mappings[0].to_start, new_mappings[0].to_start, new_mappings[0].to_end))
+                cigar_new.append(
+                    Cigar(CIGAR_M, new_mappings[0].to_end - new_mappings[0].to_start, new_mappings[0].to_start,
+                          new_mappings[0].to_end))
             else:
                 # multiple maps, not so easy
                 last = None
@@ -765,9 +813,10 @@ def _cigar_convert(cigar, chromosome, vci_file, strand='+', position=0):
         else:
             # other
             LOG.debug("OTHER CODE '{0}' found, looking at {1} at {2}".format(CIGAR_N2C[c[0]], c, current_pos))
-            raise exceptions.G2GCigarFormatError("ERROR: Not handling the values in this cigar string: {0}".format(cigar))
+            raise exceptions.G2GCigarFormatError(
+                "ERROR: Not handling the values in this cigar string: {0}".format(cigar))
 
-        #current_pos += c[1]
+        # current_pos += c[1]
         current_pos += increment
 
         LOG.debug("Current CIGAR: {0}".format(cigar_new))
@@ -789,11 +838,11 @@ def _cigar_combine_consecutive(cigar):
     while not done:
         done = True
 
-        for i in xrange(0, len(cigar)-1):
+        for i in xrange(0, len(cigar) - 1):
 
             LOG.debug("{0}={1}".format(i, cigar[i]))
-            LOG.debug("{0}={1}".format(i+1, cigar[i+1]))
-            if cigar[i].code == cigar[i+1].code:
+            LOG.debug("{0}={1}".format(i + 1, cigar[i + 1]))
+            if cigar[i].code == cigar[i + 1].code:
                 done = False
                 break
 
@@ -802,13 +851,13 @@ def _cigar_combine_consecutive(cigar):
             cigar_temp.extend(cigar[:i])
 
             cm1 = cigar[i]
-            cm2 = cigar[i+1]
+            cm2 = cigar[i + 1]
             cm_new = Cigar(cm1.code, cm1.length + cm2.length, cm1.start, cm2.end)
             cigar_temp.append(cm_new)
 
             LOG.debug("Found consecutive elements {0} and {1}, combined into {2}".format(cm1, cm2, cm_new))
 
-            cigar_temp.extend(cigar[i+2:])
+            cigar_temp.extend(cigar[i + 2:])
 
             cigar = cigar_temp
 
@@ -835,7 +884,7 @@ def _cigar_fix_pre_and_post_M(cigar):
                 length += cigar[i].length
 
         temp_cigar = [Cigar(CIGAR_S, length, 0, 0)]
-        temp_cigar.extend(cigar[i+1:])
+        temp_cigar.extend(cigar[i + 1:])
 
         cigar = temp_cigar
 
@@ -848,12 +897,12 @@ def _cigar_fix_pre_and_post_M(cigar):
         last_m = i
 
         length = 0
-        for i in xrange(last_m+1, len(cigar)):
+        for i in xrange(last_m + 1, len(cigar)):
             if cigar[i].code in [CIGAR_M, CIGAR_I, CIGAR_S]:
                 length += cigar[i].length
 
         temp_cigar = []
-        temp_cigar.extend(cigar[:i-1])
+        temp_cigar.extend(cigar[:i - 1])
         temp_cigar.append(Cigar(CIGAR_S, length, 0, 0))
         cigar = temp_cigar
 
@@ -872,7 +921,7 @@ def _cigar_remove_softs_between_m(cigar):
     while not done:
         done = True
 
-        for i in xrange(1, len(cigar)-1):
+        for i in xrange(1, len(cigar) - 1):
             if cigar[i].code == CIGAR_S:
                 done = False
                 break
@@ -887,7 +936,7 @@ def _cigar_remove_softs_between_m(cigar):
                 before = cigar[x]
                 break
 
-        for x in xrange(i+1, len(cigar)):
+        for x in xrange(i + 1, len(cigar)):
             if cigar[x].code == CIGAR_M:
                 after = cigar[x]
                 break
@@ -896,7 +945,7 @@ def _cigar_remove_softs_between_m(cigar):
             LOG.debug("Found 'S' between 'M' so removing 'S'")
             cigar_temp = []
             cigar_temp.extend(cigar[:i])
-            cigar_temp.extend(cigar[i+1:])
+            cigar_temp.extend(cigar[i + 1:])
             cigar = cigar_temp
             LOG.debug(cigar)
         else:
@@ -946,8 +995,7 @@ def _cigar_fix_lengths(cigar, sequence):
                 before = cigar[x]
                 break
 
-
-        for x in xrange(i+1, len(cigar)):
+        for x in xrange(i + 1, len(cigar)):
             if cigar[x].code == CIGAR_M:
                 after = cigar[x]
                 break
@@ -1115,6 +1163,7 @@ def convert_cigar(cigar, chromosome, vci_file, sequence, strand='+', position=0)
 
 if __name__ == '__main__':
     from .g2g_utils import get_logger, configure_logging
+
     configure_logging(10)
     LOG = get_logger()
     cigarstring = '5I3D4M9D3S104M7D2I'
@@ -1122,6 +1171,6 @@ if __name__ == '__main__':
     LOG.debug(cigarstring)
     print(cigarlist)
     cigar_new = _cigar_remove_softs_between_m(cigarlist)
-    #cigar_new = _cigar_fix_pre_and_post_M(cigarlist)
+    # cigar_new = _cigar_fix_pre_and_post_M(cigarlist)
     print(cigar_to_string(cigar_new))
     print(cigar_new)
