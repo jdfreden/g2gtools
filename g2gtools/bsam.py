@@ -495,6 +495,9 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
                     alignment_new.pos = read1_mappings[0].to_start
                     alignment_new.cigar = alignment.cigar
 
+                    alignment_new.flag |= FLAG_PROPER_PAIR
+                    print("Added proper_pair flag")
+
                     alignment_new.rnext = name_to_id[read2_mappings[0].to_chr]
                     alignment_new.pnext = read2_mappings[0].to_start
                     alignment_new.tlen = 0  # CHECK
@@ -533,6 +536,9 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
                     alignment_new.pnext = read2_mappings[0].to_start
                     alignment_new.tlen = 0  # CHECK
 
+                    alignment_new.flag |= FLAG_PROPER_PAIR
+                    print("Added proper_pair flag")
+
                     LOG.debug("\tPair Success (1:complex,2:simple): {0} {1}".format(alignment_new.pos,
                                                                                     alignment_new.cigarstring))
                     new_file.write(alignment_new)
@@ -548,6 +554,9 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
                     alignment_new.rnext = name_to_id[read2_mappings[0].to_chr]
                     alignment_new.pnext = read2_mappings[0].to_start
                     alignment_new.tlen = 0  # CHECK
+
+                    alignment_new.flag |= FLAG_PROPER_PAIR
+                    print("Added proper_pair flag")
 
                     LOG.debug("\tPair Success (1:complex,2:complex): {0} {1}".format(alignment_new.pos,
                                                                                      alignment_new.cigarstring))
