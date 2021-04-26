@@ -480,6 +480,10 @@ def convert_bam_file(vci_file, file_in, file_out, reverse=False):
                     alignment_new.pnext = read2_mappings[0].to_start
                     alignment_new.tlen = 0  # CHECK
 
+                    alignment_new.flag |= FLAG_PROPER_PAIR
+                    print("Added proper_pair flag")
+                    # from pycharm
+
                     LOG.debug("\tPair Success (1:simple,2:simple): {0} {1}".format(alignment_new.pos,
                                                                                    alignment_new.cigarstring))
                     new_file.write(alignment_new)
