@@ -27,7 +27,7 @@ logo_text = """
   \__, |____\__, |\__\___/ \___/|_|___/   v""" + version + """
    __/ |     __/ |
   |___/     |___/
-
+With Jacob Fredenburg's Changes
 """
 
 for dependency in ext_modules:
